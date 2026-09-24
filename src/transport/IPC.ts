@@ -44,13 +44,13 @@ const defaultPathList: PathData[] = [
             return path.join(getTempDir(), "snap.discord", `discord-ipc-${id}`);
         }
     },
-    {
+    // flatpaks
+    ...['com.discordapp.Discord', 'com.discordapp.DiscordCanary', 'com.discordapp.DiscordPTB', 'dev.vencord.Vesktop'].map((app) => ({
         platform: ["linux"],
         format: (id: number): string => {
-            // flatpak
-            return path.join(getTempDir(), "app", "com.discordapp.Discord", `discord-ipc-${id}`);
+            return path.join(getTempDir(), "app", app, `discord-ipc-${id}`);
         }
-    },
+    } satisfies PathData)),
     {
         platform: [],
         format: (id: number): string => {
