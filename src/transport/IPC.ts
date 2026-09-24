@@ -89,6 +89,10 @@ export class IPCTransport extends Transport {
         data: Buffer<ArrayBuffer>;
     } | null;
 
+    private heartbeatUUID?: string;
+    private connectionHeartbeat?: NodeJS.Timeout;
+    private connectionTimeout?: NodeJS.Timeout;
+
     public override get isConnected() {
         return this.socket !== undefined && this.socket.readyState === "open";
     }
@@ -165,6 +169,14 @@ export class IPCTransport extends Transport {
             },
             IPC_OPCODE.HANDSHAKE
         );
+
+        this.connectionHeartbeat = setInterval(() => {
+            this.heartbeatUUID = this.ping();
+        }, 5_000);
+        this.connectionTimeout = setTimeout(() => {
+            console.log("Connection stale");
+            this.close();
+        }, 30_000);
 
         this.socket.on("readable", () => {
             let data = this.tmpData != null ? this.tmpData.data : Buffer.alloc(0);
@@ -248,6 +260,17 @@ export class IPCTransport extends Transport {
                     this.emit("close", parsedData);
                     break;
                 }
+                case IPC_OPCODE.PONG: {
+                    if (this.heartbeatUUID == parsedData) {
+                        this.client.emit("debug", "CLIENT | Heartbeat recieved");
+                        clearTimeout(this.connectionTimeout);
+                        this.connectionTimeout = setTimeout(() => {
+                            this.client.emit("debug", "CLIENT | Heartbeat not recieved, closing stale connection");
+                            this.close();
+                        }, 30_000);
+                    }
+                    break;
+                }
                 case IPC_OPCODE.PING: {
                     this.send(parsedData, IPC_OPCODE.PONG);
                     this.emit("ping");
@@ -274,19 +297,33 @@ export class IPCTransport extends Transport {
         this.socket?.write(Buffer.concat([packet, dataBuffer]));
     }
 
-    public ping(): void {
-        this.send(crypto.randomUUID(), IPC_OPCODE.PING);
+    public ping(): string {
+        const uuid = crypto.randomUUID()
+        this.send(uuid, IPC_OPCODE.PING);
+        return uuid;
     }
 
-    public close(): Promise<void> {
+    public close(force: boolean = false): Promise<void> {
         if (!this.socket) return Promise.resolve();
 
+        clearInterval(this.connectionHeartbeat);
+        clearTimeout(this.connectionTimeout);
+        this.heartbeatUUID = undefined;
+        this.connectionHeartbeat = undefined;
+        this.connectionTimeout = undefined;
+
         return new Promise((resolve) => {
-            this.socket!.once("close", () => {
+            const onClose = () => {
                 this.emit("close", "Closed by client");
                 this.socket = undefined;
                 resolve();
-            });
+            }
+
+            if (!force)
+                this.socket!.once("close", onClose);
+            else
+                onClose();
+
             this.socket!.destroy();
         });
     }
