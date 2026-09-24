@@ -158,6 +158,7 @@ export class IPCTransport extends Transport {
     }
 
     public async connect(): Promise<void> {
+        if (this.isConnected) await this.close();
         if (!this.socket) this.socket = await this.getSocket();
 
         this.emit("open");
