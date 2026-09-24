@@ -339,16 +339,18 @@ export class Client extends AsyncEventEmitter<ClientEvents> {
                 this.#isConnected = true;
 
                 this.transport.once("close", (reason) => {
-                    this.nonceMap.forEach((promise) => {
+                    this.destroy();
+
+                    for (const promise of this.nonceMap.values()) {
                         promise.error.code =
                             typeof reason === "object" ? reason!.code : CUSTOM_RPC_ERROR_CODE.CONNECTION_ENDED;
                         promise.error.message =
                             typeof reason === "object" ? reason!.message : (reason ?? "Connection ended");
                         promise.reject(promise.error);
-                    });
+                    }
+                    this.nonceMap.clear();
 
                     this.emit("disconnected");
-                    this.destroy();
                 });
 
                 clearTimeout(timeout);
