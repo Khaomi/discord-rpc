@@ -121,8 +121,9 @@ export class Client extends AsyncEventEmitter<ClientEvents> {
     }
 
     public get isConnected() {
-        return this.transport.isConnected;
+        return this.transport.isConnected && this.#isConnected;
     }
+    #isConnected = false;
 
     private refreshTimeout?: NodeJS.Timeout;
     private connectionPromise?: Promise<void>;
@@ -316,6 +317,7 @@ export class Client extends AsyncEventEmitter<ClientEvents> {
      */
     public async connect(): Promise<void> {
         if (this.connectionPromise) return this.connectionPromise;
+        if (this.#isConnected) return;
 
         const error = new RPCError(RPC_ERROR_CODE.UNKNOWN_ERROR);
         RPCError.captureStackTrace(error, this.connect);
@@ -334,6 +336,7 @@ export class Client extends AsyncEventEmitter<ClientEvents> {
 
             this.once("connected", () => {
                 this.connectionPromise = undefined;
+                this.#isConnected = true;
 
                 this.transport.once("close", (reason) => {
                     this.nonceMap.forEach((promise) => {
@@ -345,6 +348,7 @@ export class Client extends AsyncEventEmitter<ClientEvents> {
                     });
 
                     this.emit("disconnected");
+                    this.destroy();
                 });
 
                 clearTimeout(timeout);
@@ -397,7 +401,11 @@ export class Client extends AsyncEventEmitter<ClientEvents> {
             this.refreshToken = undefined;
         }
 
-        await this.transport.close();
+        this.#application = undefined;
+        this.#user = undefined;
+        this.#isConnected = false;
+
+        if (this.transport.isConnected) await this.transport.close();
     }
 
     public getCdn() {
