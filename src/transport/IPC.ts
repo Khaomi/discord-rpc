@@ -172,7 +172,7 @@ export class IPCTransport extends Transport {
 
         const onConnectionStale = () => {
             this.client.emit("debug", "CLIENT | Heartbeat not recieved, closing stale connection");
-            this.close();
+            this.close(true);
         }
 
         this.heartbeatTimer = setInterval(() => {
