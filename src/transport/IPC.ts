@@ -83,25 +83,19 @@ const createSocket = async (path: string | [number, string]): Promise<net.Socket
 export class IPCTransport extends Transport {
     public pathList: PathData[];
     private socket?: net.Socket;
-    private tmpData: {
-        op: number;
-        length: number;
-        data: Buffer<ArrayBuffer>;
-    } | null;
+    private workingBuffer: Buffer = Buffer.alloc(0);
 
     private heartbeatUUID?: string;
     private heartbeatTimer?: NodeJS.Timeout;
     private timeoutTimer?: NodeJS.Timeout;
 
-    public override get isConnected() {
+    public override get isOpen() {
         return this.socket !== undefined && this.socket.readyState === "open";
     }
 
     constructor(options: IPCTransportOptions) {
         super(options);
-
         this.pathList = options.pathList ?? defaultPathList;
-        this.tmpData = null;
     }
 
     private async getSocket(): Promise<net.Socket> {
@@ -143,7 +137,7 @@ export class IPCTransport extends Transport {
                 `CLIENT | Found ${useablePath.length} Discord client path;\n${useablePath.map((x) => (Array.isArray(x) ? `${x[1]}:${x[0]}` : x)).join("\n")}`
             );
 
-            if (useablePath.length < 0)
+            if (useablePath.length === 0)
                 return reject(
                     new RPCError(CUSTOM_RPC_ERROR_CODE.COULD_NOT_FIND_CLIENT, "Unable to find any Discord client")
                 );
@@ -158,8 +152,9 @@ export class IPCTransport extends Transport {
     }
 
     public async connect(): Promise<void> {
-        if (this.isConnected) return;
         if (!this.socket) this.socket = await this.getSocket();
+        if (this.isConnected) return;
+        this.isConnected = true;
 
         this.emit("open");
 
@@ -172,9 +167,10 @@ export class IPCTransport extends Transport {
         );
 
         const onConnectionStale = () => {
+            this.isConnected = false;
             this.client.emit("debug", "CLIENT | Heartbeat not recieved, closing stale connection");
-            this.close(true);
-        }
+            this.close("Stale connection", true);
+        };
 
         this.heartbeatTimer = setInterval(() => {
             this.heartbeatUUID = this.ping();
@@ -182,106 +178,60 @@ export class IPCTransport extends Transport {
         this.timeoutTimer = setTimeout(onConnectionStale, this.timeoutDuration);
 
         this.socket.on("readable", () => {
-            let data = this.tmpData != null ? this.tmpData.data : Buffer.alloc(0);
+            let chunk: Buffer | null;
 
-            do {
-                if (!this.isConnected) break;
-
-                const chunk = this.socket?.read() as Buffer | undefined;
-                if (!chunk) break;
-                this.client.emit(
-                    "debug",
-                    `SERVER => CLIENT | ${chunk
-                        .toString("hex")
-                        .match(/.{1,2}/g)
-                        ?.join(" ")
-                        .toUpperCase()}`
-                );
-
-                data = Buffer.concat([data, chunk]);
-            } while (true);
-
-            if (data.length < 8) {
-                if (data.length === 0) return;
-                // TODO : Handle error
-                this.client.emit("debug", "SERVER => CLIENT | Malformed packet, invalid payload");
-                return;
+            while ((chunk = this.socket?.read() as Buffer | null) !== null) {
+                this.client.emit("debug", `SERVER => CLIENT | READ ${chunk.length} BYTES`);
+                this.workingBuffer = Buffer.concat([this.workingBuffer, chunk]);
             }
 
-            const [op, length] =
-                this.tmpData != null
-                    ? [this.tmpData.op, this.tmpData.length]
-                    : [data.readUInt32LE(0), data.readUInt32LE(4)];
+            while (this.workingBuffer.length >= 8) {
+                const op = this.workingBuffer.readUInt32LE(0);
+                const length = this.workingBuffer.readUInt32LE(4);
 
-            if (data.length > length + 8) {
-                this.client.emit(
-                    "debug",
-                    `SERVER => CLIENT | Malformed packet: expected ${length + 8} bytes, found ${data.length} instead`
-                );
-                this.tmpData = null;
-                return;
-            }
+                if (this.workingBuffer.length < length + 8) break;
 
-            if (data.length !== length + 8) {
-                if (data.length % 8192 != 0) {
-                    this.client.emit(
-                        "debug",
-                        `SERVER => CLIENT | Malformed packet: expected 8192 bytes, found ${data.length} instead`
-                    );
-                    this.tmpData = null;
-                    return;
+                const packetData = this.workingBuffer.subarray(8, length + 8);
+                this.workingBuffer = this.workingBuffer.subarray(length + 8);
+
+                let parsedData: any;
+                try {
+                    parsedData = JSON.parse(packetData.toString());
+                } catch {
+                    this.client.emit("debug", "SERVER => CLIENT | Malformed packet, invalid JSON payload");
+                    continue;
                 }
-                this.tmpData = {
-                    op: op,
-                    length: length,
-                    data: data
-                };
-                return;
-            }
 
-            this.tmpData = null;
+                this.client.emit("debug", `SERVER => CLIENT | OPCODE.${IPC_OPCODE[op]} |`, parsedData);
 
-            let parsedData: any;
-            try {
-                parsedData = JSON.parse(data.subarray(8, length + 8).toString());
-            } catch {
-                // TODO : Handle error
-                this.client.emit("debug", "SERVER => CLIENT | Malformed packet, invalid payload");
-                return;
-            }
-
-            this.client.emit("debug", `SERVER => CLIENT | OPCODE.${IPC_OPCODE[op]} |`, parsedData);
-
-            switch (op) {
-                case IPC_OPCODE.FRAME: {
-                    if (!data) break;
-
-                    this.emit("message", parsedData);
-                    break;
-                }
-                case IPC_OPCODE.CLOSE: {
-                    this.emit("close", parsedData);
-                    break;
-                }
-                case IPC_OPCODE.PONG: {
-                    if (this.heartbeatUUID == parsedData) {
-                        this.client.emit("debug", "CLIENT | Heartbeat recieved");
-                        clearTimeout(this.timeoutTimer);
-                        this.timeoutTimer = setTimeout(onConnectionStale, this.timeoutDuration);
+                switch (op) {
+                    case IPC_OPCODE.FRAME: {
+                        this.emit("message", parsedData);
+                        break;
                     }
-                    break;
-                }
-                case IPC_OPCODE.PING: {
-                    this.send(parsedData, IPC_OPCODE.PONG);
-                    this.emit("ping");
-                    break;
+                    case IPC_OPCODE.CLOSE: {
+                        this.emit("close", parsedData);
+                        break;
+                    }
+                    case IPC_OPCODE.PONG: {
+                        if (this.heartbeatUUID === parsedData) {
+                            this.client.emit("debug", "CLIENT | Heartbeat recieved");
+                            clearTimeout(this.timeoutTimer);
+                            this.timeoutTimer = setTimeout(onConnectionStale, this.timeoutDuration);
+                        }
+                        break;
+                    }
+                    case IPC_OPCODE.PING: {
+                        this.send(parsedData, IPC_OPCODE.PONG);
+                        this.emit("ping");
+                        break;
+                    }
                 }
             }
         });
 
         this.socket.on("close", () => {
-            this.socket = undefined;
-            this.emit("close", "Closed by Discord");
+            this.close("Closed by Discord", true);
         });
     }
 
@@ -303,18 +253,21 @@ export class IPCTransport extends Transport {
         return uuid;
     }
 
-    public close(force: boolean = false): Promise<void> {
+    public close(reason: string = "Closed by client", force: boolean = false): Promise<void> {
         if (!this.socket) return Promise.resolve();
+        if (!this.isOpen) return Promise.resolve();
 
+        this.isConnected = false;
         clearInterval(this.heartbeatTimer);
         clearTimeout(this.timeoutTimer);
         this.heartbeatUUID = undefined;
         this.heartbeatTimer = undefined;
         this.timeoutTimer = undefined;
+        this.workingBuffer = Buffer.alloc(0);
 
         return new Promise((resolve) => {
             const onClose = () => {
-                this.emit("close", "Closed by client");
+                this.emit("close", reason);
                 this.socket = undefined;
                 resolve();
             };

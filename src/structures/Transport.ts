@@ -224,15 +224,18 @@ export abstract class Transport extends AsyncEventEmitter<TransportEvents> {
     public heartbeatInterval: number;
     public timeoutDuration: number;
 
-    public get isConnected(): boolean {
+    public get isOpen(): boolean {
         return false;
     }
+
+    public isConnected: boolean;
 
     constructor(options: TransportOptions) {
         super();
         this.client = options.client;
         this.heartbeatInterval = options.heartbeatInterval ?? 5_000;
         this.timeoutDuration = options.timeoutDuration ?? 30_000;
+        this.isConnected = false;
     }
 
     public abstract connect(): Promise<void>;

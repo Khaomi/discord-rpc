@@ -121,7 +121,7 @@ export class Client extends AsyncEventEmitter<ClientEvents> {
     }
 
     public get isConnected() {
-        return this.transport.isConnected && this.#isConnected;
+        return this.transport.isOpen && this.#isConnected;
     }
     #isConnected = false;
 
@@ -179,6 +179,21 @@ export class Client extends AsyncEventEmitter<ClientEvents> {
 
                 this.emit((message as any).evt, message.data);
             }
+        });
+
+        this.transport.on("close", (reason) => {
+            this.destroy();
+
+            const isReasonObject = typeof reason === "object" && reason !== null;
+
+            for (const promise of this.nonceMap.values()) {
+                promise.error.code = isReasonObject ? reason!.code : CUSTOM_RPC_ERROR_CODE.CONNECTION_ENDED;
+                promise.error.message = isReasonObject ? reason!.message : (reason ?? "Connection ended");
+                promise.reject(promise.error);
+            }
+            this.nonceMap.clear();
+
+            this.emit("disconnected");
         });
     }
 
@@ -324,6 +339,7 @@ export class Client extends AsyncEventEmitter<ClientEvents> {
      */
     public async connect(): Promise<void> {
         if (this.connectionPromise) return this.connectionPromise;
+        if (this.transport.isConnected) return;
         if (this.#isConnected) return;
 
         const error = new RPCError(RPC_ERROR_CODE.UNKNOWN_ERROR);
@@ -351,22 +367,6 @@ export class Client extends AsyncEventEmitter<ClientEvents> {
             this.once("connected", () => {
                 this.connectionPromise = undefined;
                 this.#isConnected = true;
-
-                this.transport.once("close", (reason) => {
-                    this.destroy();
-
-                    const isReasonObject = typeof reason === "object" && reason !== null;
-
-                    for (const promise of this.nonceMap.values()) {
-                        promise.error.code = isReasonObject ? reason!.code : CUSTOM_RPC_ERROR_CODE.CONNECTION_ENDED;
-                        promise.error.message = isReasonObject ? reason!.message : (reason ?? "Connection ended");
-                        promise.reject(promise.error);
-                    }
-                    this.nonceMap.clear();
-
-                    this.emit("disconnected");
-                });
-
                 clearTimeout(timeout);
                 resolve();
             });
@@ -431,7 +431,7 @@ export class Client extends AsyncEventEmitter<ClientEvents> {
             this.connectionPromiseData = undefined;
         }
 
-        if (this.transport.isConnected) await this.transport.close();
+        if (this.transport.isOpen) await this.transport.close();
     }
 
     public getCdn() {
