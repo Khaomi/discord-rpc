@@ -209,8 +209,26 @@ export class Client extends AsyncEventEmitter<ClientEvents> {
         return new Promise((resolve, reject) => {
             const nonce = crypto.randomUUID();
 
+            const timeout = setTimeout(() => {
+                this.nonceMap.delete(nonce);
+                error.code = CUSTOM_RPC_ERROR_CODE.REQUEST_TIMEOUT;
+                error.message = "RPC Request timed out";
+                reject(error);
+            }, 60_000); // 1 minute is plenty
+
+            this.nonceMap.set(nonce, {
+                resolve: (val) => {
+                    clearTimeout(timeout);
+                    resolve(val);
+                },
+                reject: (err) => {
+                    clearTimeout(timeout);
+                    reject(err);
+                },
+                error
+            });
+
             this.transport.send({ cmd, args, evt, nonce });
-            this.nonceMap.set(nonce, { resolve, reject, error });
         });
     }
 
@@ -241,14 +259,14 @@ export class Client extends AsyncEventEmitter<ClientEvents> {
             passThroughBody: true
         });
 
-        this.hanleAccessTokenResponse(exchangeResponse);
+        this.handleAccessTokenResponse(exchangeResponse);
 
         this.emit("debug", "CLIENT | Access token refreshed!");
 
         return (exchangeResponse as any).access_token;
     }
 
-    private hanleAccessTokenResponse(data: any): void {
+    private handleAccessTokenResponse(data: any): void {
         if (
             !("access_token" in data) ||
             !("refresh_token" in data) ||
@@ -261,7 +279,8 @@ export class Client extends AsyncEventEmitter<ClientEvents> {
         this.rest.options.authPrefix = data.token_type;
         this.refreshToken = data.refresh_token;
 
-        this.refreshTimeout = setTimeout(() => void this.refreshAccessToken(), data.expires_in);
+        this.refreshTimeout = setTimeout(() => void this.refreshAccessToken(), data.expires_in * 1000 - 300_000);
+        this.refreshTimeout.unref();
     }
 
     private async authorize(options: AuthorizeOptions): Promise<string> {
@@ -306,7 +325,7 @@ export class Client extends AsyncEventEmitter<ClientEvents> {
             passThroughBody: true
         });
 
-        this.hanleAccessTokenResponse(exchangeResponse);
+        this.handleAccessTokenResponse(exchangeResponse);
 
         return (exchangeResponse as any).access_token;
     }
