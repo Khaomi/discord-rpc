@@ -40,21 +40,23 @@ export interface ClientOptions {
     /**
      * transport configs
      */
-    transport?: {
-        /**
-         * transport type
-         */
-        type: "ipc";
-        /**
-         * ipc transport's path list
-         */
-        pathList?: PathData[];
-    } | {
-        /**
-         * transport type
-         */
-        type: { new(options: TransportOptions): Transport }
-    };
+    transport?:
+        | {
+              /**
+               * transport type
+               */
+              type: "ipc";
+              /**
+               * ipc transport's path list
+               */
+              pathList?: PathData[];
+          }
+        | {
+              /**
+               * transport type
+               */
+              type: { new (options: TransportOptions): Transport };
+          };
 }
 
 export type ClientEvents = {
@@ -141,12 +143,12 @@ export class Client extends AsyncEventEmitter<ClientEvents> {
         this.transport =
             !options.transport || options.transport.type === "ipc"
                 ? new IPCTransport({
-                    client: this,
-                    pathList: options.transport?.pathList
-                })
+                      client: this,
+                      pathList: options.transport?.pathList
+                  })
                 : new options.transport.type({
-                    client: this
-                });
+                      client: this
+                  });
 
         this.transport.on("message", (message) => {
             if (message.cmd === "DISPATCH" && message.evt === "READY") {
@@ -176,8 +178,7 @@ export class Client extends AsyncEventEmitter<ClientEvents> {
      * @hidden
      */
     public async request<A = any, D = any>(cmd: RPC_CMD, args?: any, evt?: RPC_EVT): Promise<CommandIncoming<A, D>> {
-        if (!this.isConnected)
-            throw new RPCError(CUSTOM_RPC_ERROR_CODE.NOT_CONNECTED);
+        if (!this.isConnected) throw new RPCError(CUSTOM_RPC_ERROR_CODE.NOT_CONNECTED);
 
         const error = new RPCError(RPC_ERROR_CODE.UNKNOWN_ERROR);
         RPCError.captureStackTrace(error, this.request);

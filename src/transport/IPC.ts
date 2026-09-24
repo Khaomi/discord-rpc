@@ -298,7 +298,7 @@ export class IPCTransport extends Transport {
     }
 
     public ping(): string {
-        const uuid = crypto.randomUUID()
+        const uuid = crypto.randomUUID();
         this.send(uuid, IPC_OPCODE.PING);
         return uuid;
     }
@@ -317,12 +317,10 @@ export class IPCTransport extends Transport {
                 this.emit("close", "Closed by client");
                 this.socket = undefined;
                 resolve();
-            }
+            };
 
-            if (!force)
-                this.socket!.once("close", onClose);
-            else
-                onClose();
+            if (!force) this.socket!.once("close", onClose);
+            else onClose();
 
             this.socket!.destroy();
         });
