@@ -40,16 +40,23 @@ export interface ClientOptions {
     /**
      * transport configs
      */
-    transport?: {
-        /**
-         * transport type
-         */
-        type?: "ipc" | { new (options: TransportOptions): Transport };
-        /**
-         * ipc transport's path list
-         */
-        pathList?: PathData[];
-    };
+    transport?:
+        | {
+              /**
+               * transport type
+               */
+              type: "ipc";
+              /**
+               * ipc transport's path list
+               */
+              pathList?: PathData[];
+          }
+        | {
+              /**
+               * transport type
+               */
+              type: { new (options: TransportOptions): Transport };
+          };
 }
 
 export type ClientEvents = {
@@ -134,7 +141,7 @@ export class Client extends AsyncEventEmitter<ClientEvents> {
         this.rest = new REST({ version: "10" }).setToken("this-is-a-dummy");
 
         this.transport =
-            !options.transport?.type || options.transport.type === "ipc"
+            !options.transport || options.transport.type === "ipc"
                 ? new IPCTransport({
                       client: this,
                       pathList: options.transport?.pathList
@@ -171,6 +178,8 @@ export class Client extends AsyncEventEmitter<ClientEvents> {
      * @hidden
      */
     public async request<A = any, D = any>(cmd: RPC_CMD, args?: any, evt?: RPC_EVT): Promise<CommandIncoming<A, D>> {
+        if (!this.isConnected) throw new RPCError(CUSTOM_RPC_ERROR_CODE.NOT_CONNECTED);
+
         const error = new RPCError(RPC_ERROR_CODE.UNKNOWN_ERROR);
         RPCError.captureStackTrace(error, this.request);
 
