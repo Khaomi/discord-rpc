@@ -318,10 +318,14 @@ export class IPCTransport extends Transport {
                 resolve();
             };
 
-            if (!force) this.socket!.once("close", onClose);
-            else onClose();
+            if (!force) {
+                this.socket!.once("close", onClose);
+                this.socket!.destroy();
+            } else {
+                this.socket!.destroy();
+                onClose();
+            }
 
-            this.socket!.destroy();
         });
     }
 }
