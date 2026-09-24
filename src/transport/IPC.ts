@@ -325,7 +325,6 @@ export class IPCTransport extends Transport {
                 this.socket!.destroy();
                 onClose();
             }
-
         });
     }
 }
