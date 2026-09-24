@@ -139,7 +139,7 @@ export class Client extends AsyncEventEmitter<ClientEvents> {
         this.rest = new REST({ version: "10" }).setToken("this-is-a-dummy");
 
         this.transport =
-            !options.transport?.type || options.transport.type === "ipc"
+            !options.transport || options.transport.type === "ipc"
                 ? new IPCTransport({
                     client: this,
                     pathList: options.transport?.pathList
