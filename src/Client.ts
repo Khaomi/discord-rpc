@@ -176,6 +176,9 @@ export class Client extends AsyncEventEmitter<ClientEvents> {
      * @hidden
      */
     public async request<A = any, D = any>(cmd: RPC_CMD, args?: any, evt?: RPC_EVT): Promise<CommandIncoming<A, D>> {
+        if (!this.isConnected)
+            throw new RPCError(CUSTOM_RPC_ERROR_CODE.NOT_CONNECTED);
+
         const error = new RPCError(RPC_ERROR_CODE.UNKNOWN_ERROR);
         RPCError.captureStackTrace(error, this.request);
 
