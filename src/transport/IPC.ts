@@ -90,8 +90,8 @@ export class IPCTransport extends Transport {
     } | null;
 
     private heartbeatUUID?: string;
-    private connectionHeartbeat?: NodeJS.Timeout;
-    private connectionTimeout?: NodeJS.Timeout;
+    private heartbeatTimer?: NodeJS.Timeout;
+    private timeoutTimer?: NodeJS.Timeout;
 
     public override get isConnected() {
         return this.socket !== undefined && this.socket.readyState === "open";
@@ -170,13 +170,13 @@ export class IPCTransport extends Transport {
             IPC_OPCODE.HANDSHAKE
         );
 
-        this.connectionHeartbeat = setInterval(() => {
+        this.heartbeatTimer = setInterval(() => {
             this.heartbeatUUID = this.ping();
-        }, 5_000);
-        this.connectionTimeout = setTimeout(() => {
+        }, this.timeoutInterval);
+        this.timeoutTimer = setTimeout(() => {
             console.log("Connection stale");
             this.close();
-        }, 30_000);
+        }, this.timeoutDuration);
 
         this.socket.on("readable", () => {
             let data = this.tmpData != null ? this.tmpData.data : Buffer.alloc(0);
@@ -263,11 +263,11 @@ export class IPCTransport extends Transport {
                 case IPC_OPCODE.PONG: {
                     if (this.heartbeatUUID == parsedData) {
                         this.client.emit("debug", "CLIENT | Heartbeat recieved");
-                        clearTimeout(this.connectionTimeout);
-                        this.connectionTimeout = setTimeout(() => {
+                        clearTimeout(this.timeoutTimer);
+                        this.timeoutTimer = setTimeout(() => {
                             this.client.emit("debug", "CLIENT | Heartbeat not recieved, closing stale connection");
                             this.close();
-                        }, 30_000);
+                        }, this.timeoutDuration);
                     }
                     break;
                 }
@@ -306,11 +306,11 @@ export class IPCTransport extends Transport {
     public close(force: boolean = false): Promise<void> {
         if (!this.socket) return Promise.resolve();
 
-        clearInterval(this.connectionHeartbeat);
-        clearTimeout(this.connectionTimeout);
+        clearInterval(this.heartbeatTimer);
+        clearTimeout(this.timeoutTimer);
         this.heartbeatUUID = undefined;
-        this.connectionHeartbeat = undefined;
-        this.connectionTimeout = undefined;
+        this.heartbeatTimer = undefined;
+        this.timeoutTimer = undefined;
 
         return new Promise((resolve) => {
             const onClose = () => {
