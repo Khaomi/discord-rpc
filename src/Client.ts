@@ -127,6 +127,13 @@ export class Client extends AsyncEventEmitter<ClientEvents> {
 
     private refreshTimeout?: NodeJS.Timeout;
     private connectionPromise?: Promise<void>;
+    private connectionPromiseData?: {
+        resolve: (value?: any) => void;
+        reject: (reason?: any) => void;
+        error: RPCError;
+        timeout: NodeJS.Timeout;
+    };
+
     private nonceMap = new Map<
         string,
         { resolve: (value?: any) => void; reject: (reason?: any) => void; error: RPCError }
@@ -332,6 +339,13 @@ export class Client extends AsyncEventEmitter<ClientEvents> {
                 reject(error);
             }, 10e3);
 
+            this.connectionPromiseData = {
+                timeout,
+                reject,
+                resolve,
+                error
+            };
+
             if (typeof timeout === "object" && "unref" in timeout) timeout.unref();
 
             this.once("connected", () => {
@@ -341,11 +355,11 @@ export class Client extends AsyncEventEmitter<ClientEvents> {
                 this.transport.once("close", (reason) => {
                     this.destroy();
 
+                    const isReasonObject = typeof reason === "object" && reason !== null;
+
                     for (const promise of this.nonceMap.values()) {
-                        promise.error.code =
-                            typeof reason === "object" ? reason!.code : CUSTOM_RPC_ERROR_CODE.CONNECTION_ENDED;
-                        promise.error.message =
-                            typeof reason === "object" ? reason!.message : (reason ?? "Connection ended");
+                        promise.error.code = isReasonObject ? reason!.code : CUSTOM_RPC_ERROR_CODE.CONNECTION_ENDED;
+                        promise.error.message = isReasonObject ? reason!.message : (reason ?? "Connection ended");
                         promise.reject(promise.error);
                     }
                     this.nonceMap.clear();
@@ -406,6 +420,16 @@ export class Client extends AsyncEventEmitter<ClientEvents> {
         this.#application = undefined;
         this.#user = undefined;
         this.#isConnected = false;
+
+        if (this.connectionPromiseData) {
+            this.connectionPromise = undefined;
+            const error = this.connectionPromiseData.error;
+            error.code = CUSTOM_RPC_ERROR_CODE.CONNECTION_ENDED;
+            error.message = "Connection ended";
+            this.connectionPromiseData.reject(error);
+            clearTimeout(this.connectionPromiseData.timeout);
+            this.connectionPromiseData = undefined;
+        }
 
         if (this.transport.isConnected) await this.transport.close();
     }
