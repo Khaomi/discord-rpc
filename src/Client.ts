@@ -44,11 +44,16 @@ export interface ClientOptions {
         /**
          * transport type
          */
-        type?: "ipc" | { new (options: TransportOptions): Transport };
+        type: "ipc";
         /**
          * ipc transport's path list
          */
         pathList?: PathData[];
+    } | {
+        /**
+         * transport type
+         */
+        type: { new(options: TransportOptions): Transport }
     };
 }
 
@@ -136,12 +141,12 @@ export class Client extends AsyncEventEmitter<ClientEvents> {
         this.transport =
             !options.transport?.type || options.transport.type === "ipc"
                 ? new IPCTransport({
-                      client: this,
-                      pathList: options.transport?.pathList
-                  })
+                    client: this,
+                    pathList: options.transport?.pathList
+                })
                 : new options.transport.type({
-                      client: this
-                  });
+                    client: this
+                });
 
         this.transport.on("message", (message) => {
             if (message.cmd === "DISPATCH" && message.evt === "READY") {
