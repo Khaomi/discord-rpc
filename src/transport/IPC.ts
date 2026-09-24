@@ -170,13 +170,15 @@ export class IPCTransport extends Transport {
             IPC_OPCODE.HANDSHAKE
         );
 
+        const onConnectionStale = () => {
+            this.client.emit("debug", "CLIENT | Heartbeat not recieved, closing stale connection");
+            this.close();
+        }
+
         this.heartbeatTimer = setInterval(() => {
             this.heartbeatUUID = this.ping();
         }, this.heartbeatInterval);
-        this.timeoutTimer = setTimeout(() => {
-            console.log("Connection stale");
-            this.close();
-        }, this.timeoutDuration);
+        this.timeoutTimer = setTimeout(onConnectionStale, this.timeoutDuration);
 
         this.socket.on("readable", () => {
             let data = this.tmpData != null ? this.tmpData.data : Buffer.alloc(0);
@@ -264,10 +266,7 @@ export class IPCTransport extends Transport {
                     if (this.heartbeatUUID == parsedData) {
                         this.client.emit("debug", "CLIENT | Heartbeat recieved");
                         clearTimeout(this.timeoutTimer);
-                        this.timeoutTimer = setTimeout(() => {
-                            this.client.emit("debug", "CLIENT | Heartbeat not recieved, closing stale connection");
-                            this.close();
-                        }, this.timeoutDuration);
+                        this.timeoutTimer = setTimeout(onConnectionStale, this.timeoutDuration);
                     }
                     break;
                 }
