@@ -26,6 +26,9 @@ importers:
             "@types/ws":
                 specifier: ^8.18.1
                 version: 8.18.1
+            prettier:
+                specifier: ^3.9.8
+                version: 3.9.8
             rimraf:
                 specifier: ^6.1.3
                 version: 6.1.3
@@ -162,6 +165,14 @@ packages:
             }
         engines: { node: 18 || 20 || >=22 }
 
+    prettier@3.9.8:
+        resolution:
+            {
+                integrity: sha512-WRFq3Wn3WId7LLROfMLdH7xaFr2jR62wU8nLO6rQUOLOxNZUviyJQs1M0iIhLexSFy+L+w0ch66wtoO2jRjG0A==
+            }
+        engines: { node: ">=14" }
+        hasBin: true
+
     rimraf@6.1.3:
         resolution:
             {
@@ -273,6 +284,8 @@ snapshots:
         dependencies:
             lru-cache: 11.2.6
             minipass: 7.1.3
+
+    prettier@3.9.8: {}
 
     rimraf@6.1.3:
         dependencies:
