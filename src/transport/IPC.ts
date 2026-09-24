@@ -172,7 +172,7 @@ export class IPCTransport extends Transport {
 
         this.heartbeatTimer = setInterval(() => {
             this.heartbeatUUID = this.ping();
-        }, this.timeoutInterval);
+        }, this.heartbeatInterval);
         this.timeoutTimer = setTimeout(() => {
             console.log("Connection stale");
             this.close();
