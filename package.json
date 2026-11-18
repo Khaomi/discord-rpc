@@ -33,7 +33,7 @@
         "discord-api-types": "^0.38.55"
     },
     "devDependencies": {
-        "@sapphire/ts-config": "^5.0.3",
+        "@sapphire/ts-config": "^6.0.0",
         "@types/node": "^20",
         "prettier": "^3.9.9",
         "rimraf": "^6.1.3",
