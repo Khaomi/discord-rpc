@@ -19,8 +19,8 @@ importers:
         version: 0.38.55
     devDependencies:
       '@sapphire/ts-config':
-        specifier: ^5.0.3
-        version: 5.0.3
+        specifier: ^6.0.0
+        version: 6.0.0
       '@types/node':
         specifier: ^20
         version: 20.19.43
@@ -56,9 +56,9 @@ packages:
     resolution: {integrity: sha512-xzvBr1Q1c4lCe7i6sRnrofxeO1QTP/LKQ6A6qy0iB4x5yfiSfARMEQEghojzTNALDTcv8En04qYNIco9/K9eZQ==}
     engines: {node: '>=v14.0.0', npm: '>=7.0.0'}
 
-  '@sapphire/ts-config@5.0.3':
-    resolution: {integrity: sha512-bFyGYHFT3TpOf5Sg2P+zY2ad0t5IA2epc5HtewlghhL7MYvbZvxtKsdaNaMwAdNObBx7hpiQm5OcOhyzEwQvbQ==}
-    engines: {node: '>=v16.0.0', npm: '>=8.0.0'}
+  '@sapphire/ts-config@6.0.0':
+    resolution: {integrity: sha512-iV0Pdg8yfuwyky8PFDsOGzY5hgMh1Stbpb4rrKj9M1JEOnBq5N2WFImZWWiBBS08K1nkvXAXqFf+EYqxCeSjgw==}
+    engines: {node: '>=v24.0.0', npm: '>=11.0.0'}
 
   '@types/node@20.19.43':
     resolution: {integrity: sha512-6oYBAi5ikg4Pl+kGsoYtawUMBT2zZMCvPNF7pVLnHZfd1zf38DRiWn/gT01RYCdUqkv7Fhr+C9ot4/tb+2sVvA==}
@@ -237,8 +237,8 @@ packages:
   tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
 
-  typescript@5.4.5:
-    resolution: {integrity: sha512-vcI4UpRgg81oIRUFwR0WSIHKt11nJ7SAVlYNIu+QpqeyXP+gpQJy/Z4+F0aGxSE4MqwjyXvW/TzgkLAx2AGHwQ==}
+  typescript@6.0.3:
+    resolution: {integrity: sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==}
     engines: {node: '>=14.17'}
     hasBin: true
 
@@ -278,10 +278,10 @@ snapshots:
 
   '@sapphire/snowflake@3.5.5': {}
 
-  '@sapphire/ts-config@5.0.3':
+  '@sapphire/ts-config@6.0.0':
     dependencies:
-      tslib: 2.8.1
-      typescript: 5.4.5
+      '@types/node': 20.19.43
+      typescript: 6.0.3
 
   '@types/node@20.19.43':
     dependencies:
@@ -389,7 +389,7 @@ snapshots:
 
   tslib@2.8.1: {}
 
-  typescript@5.4.5: {}
+  typescript@6.0.3: {}
 
   typescript@7.0.2:
     optionalDependencies:
